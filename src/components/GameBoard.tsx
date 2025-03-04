@@ -156,6 +156,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
               isWinner={gameState.winner === player.id}
               isLoser={gameState.loser === player.id}
               showDice={gameState.phase === 'revealing' || player.id === 'human'}
+              diceCount={gameState.phase === 'revealing' ? gameState.diceCount : (player.id === 'human' ? countPlayerDice(player) : undefined)}
             />
           ))}
         </div>
@@ -172,6 +173,17 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
       </div>
     </div>
   );
+};
+
+// Helper function to count dice for a specific player
+const countPlayerDice = (player: Player): Record<DiceValue, number> => {
+  const count: Record<DiceValue, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  
+  player.dice.forEach(die => {
+    count[die.value]++;
+  });
+  
+  return count;
 };
 
 export default GameBoard;

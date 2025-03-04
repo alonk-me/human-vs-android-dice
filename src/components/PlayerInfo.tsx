@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Player } from '@/types/game';
+import { Player, DiceValue } from '@/types/game';
 import Dice from './Dice';
 import { User, Bot } from 'lucide-react';
 
@@ -11,6 +11,7 @@ interface PlayerInfoProps {
   isWinner?: boolean;
   isLoser?: boolean;
   showDice?: boolean;
+  diceCount?: Record<DiceValue, number>;
 }
 
 const PlayerInfo: React.FC<PlayerInfoProps> = ({
@@ -18,7 +19,8 @@ const PlayerInfo: React.FC<PlayerInfoProps> = ({
   isActive,
   isWinner = false,
   isLoser = false,
-  showDice = true
+  showDice = true,
+  diceCount
 }) => {
   return (
     <div 
@@ -63,6 +65,23 @@ const PlayerInfo: React.FC<PlayerInfoProps> = ({
               size="sm"
               isRevealed={die.revealed || player.isAI === false}
             />
+          ))}
+        </div>
+      )}
+      
+      {diceCount && (
+        <div className="mt-4 grid grid-cols-6 gap-1 w-full max-w-xs">
+          {Object.entries(diceCount).map(([value, count]) => (
+            <div key={value} className="flex flex-col items-center">
+              <div className={cn(
+                "w-6 h-6 flex items-center justify-center rounded",
+                "text-xs font-medium",
+                parseInt(value) === 1 ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800"
+              )}>
+                {value}
+              </div>
+              <span className="text-xs mt-1">{count}</span>
+            </div>
           ))}
         </div>
       )}
