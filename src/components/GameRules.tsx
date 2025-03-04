@@ -77,8 +77,8 @@ const GameRules: React.FC = () => {
           
           <section>
             <h3 className="text-lg font-medium mb-2">Special Rules</h3>
-            <p>
-              In this version, 1s (aces) are not wild. Each bet refers to the exact face value mentioned.
+            <p className="font-medium text-primary">
+              In this version, 1s (aces) are wild! They count as any face value when counting dice for a bet.
             </p>
           </section>
           

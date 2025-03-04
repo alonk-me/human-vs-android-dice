@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { 
   GameState, 
@@ -134,9 +135,15 @@ export const useGameLogic = () => {
       
       if (!currentPlayer || !previousPlayer) return prevState;
       
-      // Count the actual dice matching the bet
+      // Count the actual dice matching the bet (including 1s as wild)
       const { quantity, value } = prevState.currentBet;
-      const actualCount = prevState.diceCount[value];
+      
+      // Get all dice in play
+      const allDice = prevState.players.flatMap(player => player.dice);
+      
+      // Count how many dice match the value directly or are 1s (wild)
+      const matchingDice = allDice.filter(die => die.value === value || die.value === 1);
+      const actualCount = matchingDice.length;
       
       // Determine if challenge successful (bet was wrong)
       const isSuccessful = actualCount < quantity;

@@ -38,7 +38,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
         if (isGameStarted) {
           toast({
             title: "New Round",
-            description: "Roll the dice and place your bets!",
+            description: "Roll the dice and place your bets! Remember, 1s are wild!",
             duration: 3000,
           });
         }
@@ -72,7 +72,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
       return (
         <div className="text-center p-8">
           <h2 className="text-2xl font-medium mb-6">Liar's Dice</h2>
-          <p className="text-muted-foreground mb-8">A game of bluffing and strategy</p>
+          <p className="text-muted-foreground mb-4">A game of bluffing and strategy</p>
+          <p className="text-primary font-medium mb-8">1s are wild!</p>
           <Button 
             size="lg" 
             onClick={startGame}
@@ -139,8 +140,9 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
       <GameRules />
       
       {isGameStarted && (
-        <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-secondary text-sm">
-          Round {gameState.round}
+        <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-secondary text-sm flex items-center">
+          <span className="mr-2">Round {gameState.round}</span>
+          <span className="text-xs text-primary font-medium">(1s are wild!)</span>
         </div>
       )}
       
