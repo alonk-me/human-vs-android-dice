@@ -65,7 +65,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
         }
         break;
     }
-  }, [gameState.phase, gameState.challengeResult, gameState.winner, gameState.roundWinner, isGameStarted]);
+  }, [gameState.phase, gameState.challengeResult, gameState.winner, gameState.roundWinner, isGameStarted, getPlayerNames]);
   
   const renderGameControls = () => {
     if (!isGameStarted) {
