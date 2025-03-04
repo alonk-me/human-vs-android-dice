@@ -86,40 +86,63 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
       );
     }
     
-    if (gameState.phase === 'revealing' || gameState.phase === 'ended') {
+    if (gameState.phase === 'revealing') {
       return (
         <div className="text-center p-8 animate-fade-in">
-          {gameState.phase === 'revealing' && (
-            <>
-              <h2 className="text-xl font-medium mb-4">Round Complete</h2>
-              <p className="text-muted-foreground mb-6">
-                {gameState.roundWinner && `${getPlayerNames()[gameState.roundWinner]} won this round!`}
-              </p>
-              <Button 
-                onClick={nextRound}
-                disabled={gameState.phase === 'ended'}
-              >
-                Next Round
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </>
+          <h2 className="text-xl font-medium mb-4">Round Complete</h2>
+          <p className="text-muted-foreground mb-6">
+            {gameState.roundWinner && `${getPlayerNames()[gameState.roundWinner]} won this round!`}
+          </p>
+          
+          {gameState.currentBet && (
+            <div className="mb-6 p-4 glass-morphism rounded-lg">
+              <p className="text-sm mb-2">Challenge Results:</p>
+              <div className="flex items-center justify-center space-x-2">
+                <span className="font-medium">{gameState.currentBet.quantity}</span>
+                <span>×</span>
+                <span className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-md font-medium">
+                  {gameState.currentBet.value}
+                </span>
+                <span>were bet</span>
+              </div>
+              
+              <div className="mt-3 font-medium">
+                <span className={gameState.challengedDiceCount !== undefined ? 
+                  (gameState.challengedDiceCount >= gameState.currentBet.quantity ? "text-red-500" : "text-green-500") 
+                  : ""
+                }>
+                  {gameState.challengedDiceCount !== undefined ? 
+                    `${gameState.challengedDiceCount} actually existed` 
+                    : ""}
+                </span>
+              </div>
+            </div>
           )}
           
-          {gameState.phase === 'ended' && (
-            <>
-              <h2 className="text-xl font-medium mb-4">Game Over</h2>
-              <p className="text-muted-foreground mb-6">
-                {gameState.winner && `${getPlayerNames()[gameState.winner]} has won the game!`}
-              </p>
-              <Button 
-                onClick={restartGame}
-                className="animate-pulse-soft"
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Play Again
-              </Button>
-            </>
-          )}
+          <Button 
+            onClick={nextRound}
+          >
+            Next Round
+            <ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      );
+    }
+    
+    if (gameState.phase === 'ended') {
+      return (
+        <div className="text-center p-8 animate-fade-in">
+          <h2 className="text-xl font-medium mb-4">Game Over</h2>
+          <p className="text-muted-foreground mb-6">
+            {gameState.winner && `${getPlayerNames()[gameState.winner]} has won the game!`}
+          </p>
+          <Button 
+            onClick={restartGame}
+            className="animate-pulse-soft"
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Play Again
+          </Button>
         </div>
       );
     }

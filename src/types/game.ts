@@ -21,7 +21,7 @@ export interface Bet {
   value: DiceValue;
 }
 
-export type GamePhase = 'starting' | 'betting' | 'challenging' | 'revealing' | 'ended';
+export type GamePhase = 'starting' | 'betting' | 'revealing' | 'ended';
 
 export interface GameState {
   players: Player[];
@@ -37,6 +37,7 @@ export interface GameState {
   diceCount: Record<DiceValue, number>;
   totalDiceInGame: number;
   challengeResult: boolean | null;
+  challengedDiceCount?: number;
   history: GameEvent[];
   round: number;
 }

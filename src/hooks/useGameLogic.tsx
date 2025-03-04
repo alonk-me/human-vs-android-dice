@@ -177,6 +177,7 @@ export const useGameLogic = () => {
         challengeResult: isSuccessful,
         roundWinner,
         roundLoser,
+        challengedDiceCount: actualCount,
         history: [...prevState.history, challengeEvent, resultEvent],
         players: prevState.players.map(player => ({
           ...player,
