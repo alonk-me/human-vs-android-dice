@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { 
   GameState, 
@@ -87,12 +86,14 @@ export const useGameLogic = () => {
       const currentPlayer = prevState.players.find(p => p.id === prevState.currentPlayerId);
       if (!currentPlayer) return prevState;
       
-      // Check if this is a valid bet
+      // Check if this is a valid bet according to new rules:
+      // 1. If quantity is the same, value must be higher
+      // 2. If quantity is higher, value can be anything
       if (prevState.currentBet) {
-        const isValidQuantity = quantity > prevState.currentBet.quantity || 
-          (quantity === prevState.currentBet.quantity && value > prevState.currentBet.value);
+        const isValidBet = quantity > prevState.currentBet.quantity || 
+                          (quantity === prevState.currentBet.quantity && value > prevState.currentBet.value);
         
-        if (!isValidQuantity) return prevState;
+        if (!isValidBet) return prevState;
       }
       
       // Get the next player

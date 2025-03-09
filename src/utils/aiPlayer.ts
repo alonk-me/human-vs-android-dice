@@ -121,36 +121,44 @@ const calculateBet = (
     }
   });
   
-  // If we already have a current bet, we need to raise it
+  // If we already have a current bet, we need to raise it based on the new rules
   if (currentBet) {
     // Strategy depends on difficulty
     switch (difficulty) {
       case 'easy':
         // Easy AI tends to bid conservatively
-        if (effectiveCounts[currentBet.value] > 0) {
-          // If AI has the current bet value (or wilds), slightly increase quantity
-          return {
-            quantity: currentBet.quantity + 1,
-            value: currentBet.value
-          };
-        } else {
-          // Otherwise, keep the same quantity but increase value
+        if (Math.random() > 0.7) {
+          // Sometimes keep same quantity but increase value
           return {
             quantity: currentBet.quantity,
             value: getNextValue(currentBet.value)
+          };
+        } else {
+          // Otherwise increase quantity with same or random value
+          const randomValue = (1 + Math.floor(Math.random() * 6)) as DiceValue;
+          return {
+            quantity: currentBet.quantity + 1,
+            value: randomValue
           };
         }
         
       case 'hard':
         // Hard AI makes more strategic bets
-        // This is a simplified version of what could be more complex
         
         // If AI has a strong hand of a particular value (including wilds)
         if (effectiveCounts[bestValue] >= 2) {
-          // More aggressive betting on strong hands
-          if (canBidValue(currentBet, bestValue)) {
+          // If the current bet is already on our strong value, raise quantity
+          if (bestValue === currentBet.value) {
             return {
-              quantity: Math.max(currentBet.quantity, Math.floor(totalDiceInGame / 3)),
+              quantity: currentBet.quantity + 1,
+              value: bestValue
+            };
+          }
+          
+          // If our best value is higher than current bet, keep quantity but switch to our value
+          if (bestValue > currentBet.value) {
+            return {
+              quantity: currentBet.quantity,
               value: bestValue
             };
           }
@@ -160,32 +168,27 @@ const calculateBet = (
         
       case 'medium':
       default:
-        // Medium difficulty - balanced approach
-        if (getValueRank(bestValue) > getValueRank(currentBet.value)) {
-          // If AI's best value is higher, bid it with minimal quantity increase
-          return {
-            quantity: currentBet.quantity,
-            value: bestValue
-          };
-        } else if (effectiveCounts[currentBet.value] > 0) {
-          // If AI has current value (or wilds), slightly increase quantity
+        // Medium difficulty - balanced approach with new rules
+        const shouldRaiseQuantity = Math.random() > 0.5;
+        
+        if (shouldRaiseQuantity) {
+          // Raise quantity and pick a good value
           return {
             quantity: currentBet.quantity + 1,
-            value: currentBet.value
+            value: effectiveCounts[bestValue] > 0 ? bestValue : (2 + Math.floor(Math.random() * 5)) as DiceValue
+          };
+        } else if (currentBet.value < 6) {
+          // Keep quantity and raise value
+          return {
+            quantity: currentBet.quantity,
+            value: getNextValue(currentBet.value)
           };
         } else {
-          // Otherwise make a minimal valid increase
-          if (currentBet.value < 6) {
-            return {
-              quantity: currentBet.quantity,
-              value: getNextValue(currentBet.value)
-            };
-          } else {
-            return {
-              quantity: currentBet.quantity + 1,
-              value: 2 // Skip 1 since it's wild
-            };
-          }
+          // If we can't raise value (already at 6), must raise quantity
+          return {
+            quantity: currentBet.quantity + 1,
+            value: (2 + Math.floor(Math.random() * 5)) as DiceValue
+          };
         }
     }
   } else {

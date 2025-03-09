@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -44,9 +43,7 @@ const BettingControls: React.FC<BettingControlsProps> = ({
   // Generate valid quantity options
   const getQuantityOptions = () => {
     const options = [];
-    const minQuantity = currentBet 
-      ? (currentBet.value === diceValue ? currentBet.quantity + 1 : currentBet.quantity) 
-      : 1;
+    const minQuantity = currentBet ? 1 : 1;
     
     for (let i = minQuantity; i <= totalDice; i++) {
       options.push(
@@ -65,9 +62,21 @@ const BettingControls: React.FC<BettingControlsProps> = ({
     const values: DiceValue[] = [1, 2, 3, 4, 5, 6];
     
     for (const value of values) {
-      const isValidOption = !currentBet || 
-        value > currentBet.value || 
-        (value === currentBet.value && quantity > currentBet.quantity);
+      // If no current bet, all values are valid
+      if (!currentBet) {
+        options.push(
+          <SelectItem key={`value-${value}`} value={value.toString()}>
+            {value}
+          </SelectItem>
+        );
+        continue;
+      }
+      
+      // New rule:
+      // 1. If keeping same quantity, can only select higher dice values
+      // 2. If increasing quantity, can select any dice value
+      const isValidOption = quantity > currentBet.quantity || 
+                           (quantity === currentBet.quantity && value > currentBet.value);
       
       options.push(
         <SelectItem 
@@ -84,6 +93,16 @@ const BettingControls: React.FC<BettingControlsProps> = ({
   };
   
   const handlePlaceBet = () => {
+    // Validate the bet against current rules before placing
+    if (currentBet) {
+      const isValidBet = quantity > currentBet.quantity || 
+                        (quantity === currentBet.quantity && diceValue > currentBet.value);
+      
+      if (!isValidBet) {
+        return; // Don't place invalid bets
+      }
+    }
+    
     onPlaceBet(quantity, diceValue);
   };
   
