@@ -1,3 +1,4 @@
+
 # Welcome to your Lovable project
 
 ## Project info
@@ -36,6 +37,20 @@ npm i
 npm run dev
 ```
 
+**Run with Docker**
+
+If you prefer to use Docker, you can build and run the application in a container:
+
+```sh
+# Build the Docker image
+docker build -t dice-game .
+
+# Run the container
+docker run -p 8080:8080 dice-game
+```
+
+Then open your browser and navigate to `http://localhost:8080`
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).
@@ -67,3 +82,4 @@ Simply open [Lovable](https://lovable.dev/projects/718f0020-4820-418b-9055-56c8a
 ## I want to use a custom domain - is that possible?
 
 We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+
