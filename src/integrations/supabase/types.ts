@@ -9,7 +9,139 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      dice_states: {
+        Row: {
+          created_at: string | null
+          dice_values: number[]
+          id: string
+          player_id: string
+          round: number
+          session_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dice_values: number[]
+          id?: string
+          player_id: string
+          round: number
+          session_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dice_values?: number[]
+          id?: string
+          player_id?: string
+          round?: number
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dice_states_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_events: {
+        Row: {
+          created_at: string | null
+          data: Json
+          event_type: string
+          id: string
+          player_id: string
+          round: number
+          session_id: string | null
+          target_player_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          event_type: string
+          id?: string
+          player_id: string
+          round: number
+          session_id?: string | null
+          target_player_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          event_type?: string
+          id?: string
+          player_id?: string
+          round?: number
+          session_id?: string | null
+          target_player_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "game_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          loser_id: string | null
+          round_count: number
+          total_dice_at_start: number
+          winner_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          loser_id?: string | null
+          round_count: number
+          total_dice_at_start: number
+          winner_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          loser_id?: string | null
+          round_count?: number
+          total_dice_at_start?: number
+          winner_id?: string | null
+        }
+        Relationships: []
+      }
+      ml_models: {
+        Row: {
+          created_at: string | null
+          file_path: string | null
+          id: string
+          model_name: string
+          parameters: Json | null
+          version: number | null
+          win_rate: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_path?: string | null
+          id?: string
+          model_name: string
+          parameters?: Json | null
+          version?: number | null
+          win_rate?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          file_path?: string | null
+          id?: string
+          model_name?: string
+          parameters?: Json | null
+          version?: number | null
+          win_rate?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   GameState, 
   GamePhase, 
@@ -9,6 +10,7 @@ import {
   GameEvent 
 } from '@/types/game';
 import { getAIAction } from '@/utils/aiPlayer';
+import { toast } from '@/components/ui/use-toast';
 
 const INITIAL_DICE_COUNT = 5;
 
@@ -29,12 +31,12 @@ export const useGameLogic = () => {
     challengeResult: null,
     history: [],
     round: 0,
+    sessionId: null,
   });
   
   const [isGameStarted, setIsGameStarted] = useState(false);
   
-  // Initialize game
-  const startGame = useCallback(() => {
+  const startGame = useCallback(async () => {
     const humanPlayer: Player = {
       id: 'human',
       name: 'You',
@@ -53,9 +55,35 @@ export const useGameLogic = () => {
     
     const firstPlayerId = Math.random() < 0.5 ? 'human' : 'ai';
     
-    const totalDiceCount = humanPlayer.dice.length + aiPlayer.dice.length;
-    const diceCount = countDice([...humanPlayer.dice, ...aiPlayer.dice]);
-    
+    const { data: session, error: sessionError } = await supabase
+      .from('game_sessions')
+      .insert({
+        total_dice_at_start: INITIAL_DICE_COUNT * 2,
+        round_count: 1
+      })
+      .select()
+      .single();
+
+    if (sessionError) {
+      console.error('Error creating game session:', sessionError);
+      return;
+    }
+
+    await supabase.from('dice_states').insert([
+      {
+        session_id: session.id,
+        player_id: 'human',
+        round: 1,
+        dice_values: humanPlayer.dice.map(d => d.value)
+      },
+      {
+        session_id: session.id,
+        player_id: 'ai',
+        round: 1,
+        dice_values: aiPlayer.dice.map(d => d.value)
+      }
+    ]);
+
     setGameState({
       players: [humanPlayer, aiPlayer],
       currentPlayerId: firstPlayerId,
@@ -67,28 +95,24 @@ export const useGameLogic = () => {
       loser: null,
       roundWinner: null,
       roundLoser: null,
-      diceCount,
-      totalDiceInGame: totalDiceCount,
+      diceCount: countDice([...humanPlayer.dice, ...aiPlayer.dice]),
+      totalDiceInGame: INITIAL_DICE_COUNT * 2,
       challengeResult: null,
       history: [],
       round: 1,
+      sessionId: session.id
     });
     
     setIsGameStarted(true);
   }, []);
   
-  // Place a bet
-  const placeBet = useCallback((quantity: number, value: DiceValue) => {
+  const placeBet = useCallback(async (quantity: number, value: DiceValue) => {
     setGameState((prevState) => {
-      // Validate bet
       if (prevState.phase !== 'betting') return prevState;
       
       const currentPlayer = prevState.players.find(p => p.id === prevState.currentPlayerId);
       if (!currentPlayer) return prevState;
       
-      // Check if this is a valid bet according to new rules:
-      // 1. If quantity is the same, value must be higher
-      // 2. If quantity is higher, value can be anything
       if (prevState.currentBet) {
         const isValidBet = quantity > prevState.currentBet.quantity || 
                           (quantity === prevState.currentBet.quantity && value > prevState.currentBet.value);
@@ -96,24 +120,31 @@ export const useGameLogic = () => {
         if (!isValidBet) return prevState;
       }
       
-      // Get the next player
       const nextPlayerIndex = prevState.players.findIndex(p => p.id === prevState.currentPlayerId) + 1;
       const nextPlayer = prevState.players[nextPlayerIndex % prevState.players.length];
       
-      // Create the new bet
       const newBet: Bet = {
         playerId: currentPlayer.id,
         quantity,
         value,
       };
       
-      // Add event to history
       const newEvent: GameEvent = {
         type: 'bet',
         playerId: currentPlayer.id,
         bet: newBet,
         timestamp: Date.now(),
       };
+      
+      if (gameState.sessionId) {
+        await supabase.from('game_events').insert({
+          session_id: gameState.sessionId,
+          event_type: 'bet',
+          player_id: currentPlayer.id,
+          round: gameState.round,
+          data: { quantity, value }
+        });
+      }
       
       return {
         ...prevState,
@@ -124,10 +155,9 @@ export const useGameLogic = () => {
         history: [...prevState.history, newEvent],
       };
     });
-  }, []);
+  }, [gameState]);
   
-  // Challenge the current bet
-  const challenge = useCallback(() => {
+  const challenge = useCallback(async () => {
     setGameState((prevState) => {
       if (prevState.phase !== 'betting' || !prevState.currentBet) return prevState;
       
@@ -136,24 +166,18 @@ export const useGameLogic = () => {
       
       if (!currentPlayer || !previousPlayer) return prevState;
       
-      // Count the actual dice matching the bet (including 1s as wild)
       const { quantity, value } = prevState.currentBet;
       
-      // Get all dice in play
       const allDice = prevState.players.flatMap(player => player.dice);
       
-      // Count how many dice match the value directly or are 1s (wild)
       const matchingDice = allDice.filter(die => die.value === value || die.value === 1);
       const actualCount = matchingDice.length;
       
-      // Determine if challenge successful (bet was wrong)
       const isSuccessful = actualCount < quantity;
       
-      // Determine the winner and loser of this round
       const roundWinner = isSuccessful ? currentPlayer.id : previousPlayer.id;
       const roundLoser = isSuccessful ? previousPlayer.id : currentPlayer.id;
       
-      // Create the challenge event
       const challengeEvent: GameEvent = {
         type: 'challenge',
         playerId: currentPlayer.id,
@@ -161,7 +185,6 @@ export const useGameLogic = () => {
         timestamp: Date.now(),
       };
       
-      // Create the result event
       const resultEvent: GameEvent = {
         type: 'result',
         playerId: currentPlayer.id,
@@ -171,6 +194,34 @@ export const useGameLogic = () => {
         },
         timestamp: Date.now(),
       };
+      
+      if (gameState.sessionId) {
+        await supabase.from('game_events').insert({
+          session_id: gameState.sessionId,
+          event_type: 'challenge',
+          player_id: currentPlayer.id,
+          target_player_id: previousPlayer.id,
+          round: gameState.round,
+          data: { result: isSuccessful, actual_count: actualCount }
+        });
+
+        if (gameOver) {
+          await supabase
+            .from('game_sessions')
+            .update({
+              winner_id: winner?.id,
+              loser_id: loser?.id,
+              round_count: gameState.round
+            })
+            .eq('id', gameState.sessionId);
+
+          try {
+            await supabase.functions.invoke('train-model');
+          } catch (error) {
+            console.error('Error training model:', error);
+          }
+        }
+      }
       
       return {
         ...prevState,
@@ -189,19 +240,17 @@ export const useGameLogic = () => {
         }))
       };
     });
-  }, []);
+  }, [gameState]);
   
-  // Move to the next round
-  const nextRound = useCallback(() => {
+  const nextRound = useCallback(async () => {
     setGameState((prevState) => {
       if (prevState.phase !== 'revealing') return prevState;
       
-      // Remove a die from the loser
       const updatedPlayers = prevState.players.map(player => {
         if (player.id === prevState.roundLoser) {
           const newDice = [...player.dice];
           if (newDice.length > 0) {
-            newDice.pop(); // Remove one die
+            newDice.pop();
           }
           return {
             ...player,
@@ -211,7 +260,6 @@ export const useGameLogic = () => {
         return player;
       });
       
-      // Check if game is over (one player has no dice)
       const gameOver = updatedPlayers.some(player => player.dice.length === 0);
       
       if (gameOver) {
@@ -227,23 +275,29 @@ export const useGameLogic = () => {
         };
       }
       
-      // Roll new dice for the next round
       const playersWithNewDice = updatedPlayers.map(player => ({
         ...player,
         dice: generateDice(player.dice.length, player.id),
       }));
       
-      // Determine who starts the next round (loser of previous round)
-      const startingPlayerId = prevState.roundLoser;
-      
-      // Count dice for the new round
       const allDice = playersWithNewDice.flatMap(player => player.dice);
       const newDiceCount = countDice(allDice);
+      
+      if (gameState.sessionId) {
+        const newDice = playersWithNewDice.map(player => ({
+          session_id: gameState.sessionId,
+          player_id: player.id,
+          round: gameState.round + 1,
+          dice_values: player.dice.map(d => d.value)
+        }));
+
+        await supabase.from('dice_states').insert(newDice);
+      }
       
       return {
         ...prevState,
         players: playersWithNewDice,
-        currentPlayerId: startingPlayerId || prevState.players[0].id,
+        currentPlayerId: prevState.roundLoser || prevState.players[0].id,
         previousPlayerId: null,
         currentBet: null,
         previousBet: null,
@@ -256,9 +310,8 @@ export const useGameLogic = () => {
         round: prevState.round + 1,
       };
     });
-  }, []);
+  }, [gameState]);
   
-  // Restart the entire game
   const restartGame = useCallback(() => {
     setIsGameStarted(false);
     setGameState({
@@ -277,27 +330,24 @@ export const useGameLogic = () => {
       challengeResult: null,
       history: [],
       round: 0,
+      sessionId: null,
     });
     
-    // Short delay for better UI experience
     setTimeout(() => {
       startGame();
     }, 500);
   }, [startGame]);
   
-  // AI player logic
   useEffect(() => {
     const handleAITurn = async () => {
       const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayerId);
       
-      // Check if it's the AI's turn and it's betting phase
       if (
         currentPlayer && 
         currentPlayer.isAI && 
         gameState.phase === 'betting' && 
         !gameState.winner
       ) {
-        // Add a small delay for better UX
         const aiAction = await getAIAction(
           gameState,
           currentPlayer,
@@ -316,12 +366,10 @@ export const useGameLogic = () => {
     return () => clearTimeout(timer);
   }, [gameState, challenge, placeBet]);
   
-  // Helper to get current player
   const getCurrentPlayer = useCallback(() => {
     return gameState.players.find(player => player.id === gameState.currentPlayerId);
   }, [gameState.players, gameState.currentPlayerId]);
   
-  // Helper to get player names
   const getPlayerNames = useCallback(() => {
     const names: Record<string, string> = {};
     gameState.players.forEach(player => {
@@ -343,7 +391,6 @@ export const useGameLogic = () => {
   };
 };
 
-// Helper function to generate dice
 const generateDice = (count: number, playerId: string): Dice[] => {
   return Array.from({ length: count }, (_, index) => ({
     id: parseInt(`${playerId === 'human' ? '1' : '2'}${index}`),
@@ -352,7 +399,6 @@ const generateDice = (count: number, playerId: string): Dice[] => {
   }));
 };
 
-// Helper function to count dice by value
 const countDice = (dice: Dice[]): Record<DiceValue, number> => {
   const count: Record<DiceValue, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   
