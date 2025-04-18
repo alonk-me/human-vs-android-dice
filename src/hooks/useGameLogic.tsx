@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -106,7 +107,7 @@ export const useGameLogic = () => {
     setIsGameStarted(true);
   }, []);
   
-  const placeBet = useCallback(async (quantity: number, value: DiceValue) => {
+  const placeBet = useCallback((quantity: number, value: DiceValue) => {
     setGameState((prevState) => {
       if (prevState.phase !== 'betting') return prevState;
       
@@ -136,13 +137,18 @@ export const useGameLogic = () => {
         timestamp: Date.now(),
       };
       
-      if (gameState.sessionId) {
-        await supabase.from('game_events').insert({
-          session_id: gameState.sessionId,
+      // Store the bet in Supabase without awaiting
+      if (prevState.sessionId) {
+        supabase.from('game_events').insert({
+          session_id: prevState.sessionId,
           event_type: 'bet',
           player_id: currentPlayer.id,
-          round: gameState.round,
+          round: prevState.round,
           data: { quantity, value }
+        }).then(result => {
+          if (result.error) {
+            console.error('Error saving bet event:', result.error);
+          }
         });
       }
       
@@ -155,9 +161,9 @@ export const useGameLogic = () => {
         history: [...prevState.history, newEvent],
       };
     });
-  }, [gameState]);
+  }, []);
   
-  const challenge = useCallback(async () => {
+  const challenge = useCallback(() => {
     setGameState((prevState) => {
       if (prevState.phase !== 'betting' || !prevState.currentBet) return prevState;
       
@@ -195,32 +201,54 @@ export const useGameLogic = () => {
         timestamp: Date.now(),
       };
       
-      if (gameState.sessionId) {
-        await supabase.from('game_events').insert({
-          session_id: gameState.sessionId,
+      const updatedPlayers = prevState.players.map(player => ({
+        ...player,
+        dice: player.dice.map(die => ({
+          ...die,
+          revealed: true
+        }))
+      }));
+      
+      // Check if game will be over after this round
+      const playerLosing = updatedPlayers.find(p => p.id === roundLoser);
+      const gameWillBeOver = playerLosing && playerLosing.dice.length <= 1;
+      
+      // Store the challenge in Supabase without awaiting
+      if (prevState.sessionId) {
+        supabase.from('game_events').insert({
+          session_id: prevState.sessionId,
           event_type: 'challenge',
           player_id: currentPlayer.id,
           target_player_id: previousPlayer.id,
-          round: gameState.round,
+          round: prevState.round,
           data: { result: isSuccessful, actual_count: actualCount }
-        });
-
-        if (gameOver) {
-          await supabase
-            .from('game_sessions')
-            .update({
-              winner_id: winner?.id,
-              loser_id: loser?.id,
-              round_count: gameState.round
-            })
-            .eq('id', gameState.sessionId);
-
-          try {
-            await supabase.functions.invoke('train-model');
-          } catch (error) {
-            console.error('Error training model:', error);
+        }).then(result => {
+          if (result.error) {
+            console.error('Error saving challenge event:', result.error);
           }
-        }
+          
+          // Handle game over operations
+          if (gameWillBeOver) {
+            const winner = updatedPlayers.find(p => p.id !== roundLoser);
+            const winnerId = winner ? winner.id : null;
+            
+            supabase
+              .from('game_sessions')
+              .update({
+                winner_id: winnerId,
+                loser_id: roundLoser,
+                round_count: prevState.round
+              })
+              .eq('id', prevState.sessionId)
+              .then(() => {
+                // Train model after game is over
+                supabase.functions.invoke('train-model')
+                  .catch(error => {
+                    console.error('Error training model:', error);
+                  });
+              });
+          }
+        });
       }
       
       return {
@@ -231,18 +259,12 @@ export const useGameLogic = () => {
         roundLoser,
         challengedDiceCount: actualCount,
         history: [...prevState.history, challengeEvent, resultEvent],
-        players: prevState.players.map(player => ({
-          ...player,
-          dice: player.dice.map(die => ({
-            ...die,
-            revealed: true
-          }))
-        }))
+        players: updatedPlayers
       };
     });
-  }, [gameState]);
+  }, []);
   
-  const nextRound = useCallback(async () => {
+  const nextRound = useCallback(() => {
     setGameState((prevState) => {
       if (prevState.phase !== 'revealing') return prevState;
       
@@ -283,15 +305,21 @@ export const useGameLogic = () => {
       const allDice = playersWithNewDice.flatMap(player => player.dice);
       const newDiceCount = countDice(allDice);
       
-      if (gameState.sessionId) {
+      // Store the new dice state in Supabase without awaiting
+      if (prevState.sessionId) {
         const newDice = playersWithNewDice.map(player => ({
-          session_id: gameState.sessionId,
+          session_id: prevState.sessionId,
           player_id: player.id,
-          round: gameState.round + 1,
+          round: prevState.round + 1,
           dice_values: player.dice.map(d => d.value)
         }));
 
-        await supabase.from('dice_states').insert(newDice);
+        supabase.from('dice_states').insert(newDice)
+          .then(result => {
+            if (result.error) {
+              console.error('Error saving dice states:', result.error);
+            }
+          });
       }
       
       return {
@@ -310,7 +338,7 @@ export const useGameLogic = () => {
         round: prevState.round + 1,
       };
     });
-  }, [gameState]);
+  }, []);
   
   const restartGame = useCallback(() => {
     setIsGameStarted(false);

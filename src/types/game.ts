@@ -40,6 +40,7 @@ export interface GameState {
   challengedDiceCount?: number;
   history: GameEvent[];
   round: number;
+  sessionId: string | null;
 }
 
 export interface GameEvent {
