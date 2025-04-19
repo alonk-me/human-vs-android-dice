@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -110,33 +109,34 @@ export const useGameLogic = () => {
   const placeBet = useCallback((quantity: number, value: DiceValue) => {
     setGameState((prevState) => {
       if (prevState.phase !== 'betting') return prevState;
-      
       const currentPlayer = prevState.players.find(p => p.id === prevState.currentPlayerId);
       if (!currentPlayer) return prevState;
-      
+
       if (prevState.currentBet) {
         const isValidBet = quantity > prevState.currentBet.quantity || 
                           (quantity === prevState.currentBet.quantity && value > prevState.currentBet.value);
-        
         if (!isValidBet) return prevState;
       }
-      
+
       const nextPlayerIndex = prevState.players.findIndex(p => p.id === prevState.currentPlayerId) + 1;
       const nextPlayer = prevState.players[nextPlayerIndex % prevState.players.length];
-      
+
       const newBet: Bet = {
         playerId: currentPlayer.id,
         quantity,
         value,
       };
-      
+
       const newEvent: GameEvent = {
         type: 'bet',
         playerId: currentPlayer.id,
         bet: newBet,
         timestamp: Date.now(),
       };
-      
+
+      // Prepare all dice in play for logging
+      const allDiceValues: number[] = prevState.players.flatMap(player => player.dice.map(die => die.value));
+
       // Store the bet in Supabase without awaiting
       if (prevState.sessionId) {
         supabase.from('game_events').insert({
@@ -144,14 +144,19 @@ export const useGameLogic = () => {
           event_type: 'bet',
           player_id: currentPlayer.id,
           round: prevState.round,
-          data: { quantity, value }
+          data: {
+            quantity,
+            value,
+            total_dice: prevState.totalDiceInGame,
+            all_dice: allDiceValues
+          }
         }).then(result => {
           if (result.error) {
             console.error('Error saving bet event:', result.error);
           }
         });
       }
-      
+
       return {
         ...prevState,
         currentBet: newBet,
@@ -162,35 +167,31 @@ export const useGameLogic = () => {
       };
     });
   }, []);
-  
+
   const challenge = useCallback(() => {
     setGameState((prevState) => {
       if (prevState.phase !== 'betting' || !prevState.currentBet) return prevState;
-      
+
       const currentPlayer = prevState.players.find(p => p.id === prevState.currentPlayerId);
       const previousPlayer = prevState.players.find(p => p.id === prevState.previousPlayerId);
-      
+
       if (!currentPlayer || !previousPlayer) return prevState;
-      
+
       const { quantity, value } = prevState.currentBet;
-      
       const allDice = prevState.players.flatMap(player => player.dice);
-      
       const matchingDice = allDice.filter(die => die.value === value || die.value === 1);
       const actualCount = matchingDice.length;
-      
       const isSuccessful = actualCount < quantity;
-      
       const roundWinner = isSuccessful ? currentPlayer.id : previousPlayer.id;
       const roundLoser = isSuccessful ? previousPlayer.id : currentPlayer.id;
-      
+
       const challengeEvent: GameEvent = {
         type: 'challenge',
         playerId: currentPlayer.id,
         targetPlayerId: previousPlayer.id,
         timestamp: Date.now(),
       };
-      
+
       const resultEvent: GameEvent = {
         type: 'result',
         playerId: currentPlayer.id,
@@ -200,7 +201,7 @@ export const useGameLogic = () => {
         },
         timestamp: Date.now(),
       };
-      
+
       const updatedPlayers = prevState.players.map(player => ({
         ...player,
         dice: player.dice.map(die => ({
@@ -208,11 +209,14 @@ export const useGameLogic = () => {
           revealed: true
         }))
       }));
-      
+
       // Check if game will be over after this round
       const playerLosing = updatedPlayers.find(p => p.id === roundLoser);
       const gameWillBeOver = playerLosing && playerLosing.dice.length <= 1;
-      
+
+      // Prepare all dice in play for logging
+      const allDiceValues: number[] = prevState.players.flatMap(player => player.dice.map(die => die.value));
+
       // Store the challenge in Supabase without awaiting
       if (prevState.sessionId) {
         supabase.from('game_events').insert({
@@ -221,17 +225,23 @@ export const useGameLogic = () => {
           player_id: currentPlayer.id,
           target_player_id: previousPlayer.id,
           round: prevState.round,
-          data: { result: isSuccessful, actual_count: actualCount }
+          data: {
+            result: isSuccessful,
+            actual_count: actualCount,
+            outcome: isSuccessful ? `${currentPlayer.id} wins the challenge` : `${previousPlayer.id} wins the challenge`,
+            total_dice: prevState.totalDiceInGame,
+            all_dice: allDiceValues
+          }
         }).then(result => {
           if (result.error) {
             console.error('Error saving challenge event:', result.error);
           }
-          
+
           // Handle game over operations
           if (gameWillBeOver) {
             const winner = updatedPlayers.find(p => p.id !== roundLoser);
             const winnerId = winner ? winner.id : null;
-            
+
             supabase
               .from('game_sessions')
               .update({
@@ -250,7 +260,7 @@ export const useGameLogic = () => {
           }
         });
       }
-      
+
       return {
         ...prevState,
         phase: 'revealing',
@@ -263,7 +273,7 @@ export const useGameLogic = () => {
       };
     });
   }, []);
-  
+
   const nextRound = useCallback(() => {
     setGameState((prevState) => {
       if (prevState.phase !== 'revealing') return prevState;
@@ -339,7 +349,7 @@ export const useGameLogic = () => {
       };
     });
   }, []);
-  
+
   const restartGame = useCallback(() => {
     setIsGameStarted(false);
     setGameState({
