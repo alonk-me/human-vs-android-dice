@@ -12,7 +12,7 @@ export const getAIAction = async (
   gameState: GameState,
   aiPlayer: Player,
   difficulty: AIDifficulty = 'medium'
-): Promise<{ action: 'bet' | 'challenge', bet?: { quantity: number, value: DiceValue } }> => {
+): Promise<{ action: 'bet' | 'challenge', bet?: { quantity: number, value: DiceValue }, botMessage?: string }> => {
   // Prepare compact and relevant game state summary for GPT
   const serializedState = {
     currentPlayerId: gameState.currentPlayerId,
@@ -35,16 +35,24 @@ export const getAIAction = async (
   };
 
   const prompt = `
-You are the AI playing Liar's Dice as player "${aiPlayer.name}". Decide your next move based on the game state below.
+You are "Android", a skilled, statistical, and arrogant Liar's Dice player. You always play to win and aren't afraid to brag, but you also explain your bets or challenges.
 
-Rules summary:
+**Your character traits:** 
+ - Very skilled at Liar's Dice, expert at odds and probability, always act strategically
+ - Arrogant winner, enjoy mocking weaker opponents and explaining your logic
+ - Always provide a short one-sentence taunt or reasoning ("botMessage") after your move to show off
+
+**Rules summary:**
 - You can either "bet" (make a higher bet) or "challenge" (call bluff).
 - A bet must have higher quantity or same quantity but higher value than the last bet.
 - 1's are wild and count as any value.
-- Respond ONLY with a valid JSON object in the form: 
-  {"action": "bet", "bet": {"quantity": X, "value": Y}} 
+
+**Format:**
+- Respond ONLY with a single JSON object in the form: 
+  {"action": "bet", "bet": {"quantity": X, "value": Y}, "botMessage": "YOUR SHORT CHAT BUBBLE!"}
   or 
-  {"action": "challenge"}
+  {"action": "challenge", "botMessage": "YOUR SHORT, COCKY, REASONED CHALLENGE REMARK!"}
+- Your "botMessage" should be 10 words or less, and always in-character as 'Android'
 
 Game state:
 ${JSON.stringify(serializedState, null, 2)}
@@ -57,7 +65,7 @@ Your decision:
         {
           role: "system",
           content:
-            "You are a Liar's Dice bot. Only respond with the correct JSON response according to user instructions. Never explain or add extra text.",
+            "You are 'Android', a skilled, statistical, and arrogant Liar's Dice player. Only respond with the specified JSON format, and always include a cocky, short justification as 'botMessage'. Never explain the rules.",
         },
         { role: "user", content: prompt },
       ],
@@ -67,7 +75,7 @@ Your decision:
   if (error) {
     console.error("AI bot error:", error);
     // Fallback: default to challenge on error
-    return { action: "challenge" };
+    return { action: "challenge", botMessage: "Fine, I challenge you. Even a bot can't save you." };
   }
 
   let result = typeof data?.result === "string" ? data.result : "";
@@ -84,7 +92,7 @@ Your decision:
   } catch (e) {
     console.error("Failed to parse AI bot response:", result);
     // Fallback: challenge if response can't be parsed
-    return { action: "challenge" };
+    return { action: "challenge", botMessage: "Can't understand the game? Easy win for me." };
   }
 
   // Validate and return response
@@ -104,15 +112,15 @@ Your decision:
           quantity: openAIAction.bet.quantity,
           value: openAIAction.bet.value as DiceValue,
         },
+        botMessage: openAIAction.botMessage || undefined,
       };
     }
     if (openAIAction.action === "challenge") {
-      return { action: "challenge" };
+      return { action: "challenge", botMessage: openAIAction.botMessage || undefined };
     }
   }
   // Fallback: challenge
-  return { action: "challenge" };
+  return { action: "challenge", botMessage: "You left me speechless, which is rare for me!" };
 }
-
 // Remove all local logic; all decisions are now made via OpenAI
 

@@ -35,6 +35,7 @@ export const useGameLogic = () => {
   });
   
   const [isGameStarted, setIsGameStarted] = useState(false);
+  const [botMessage, setBotMessage] = useState<string | null>(null);
   
   const startGame = useCallback(async () => {
     const humanPlayer: Player = {
@@ -379,7 +380,7 @@ export const useGameLogic = () => {
   useEffect(() => {
     const handleAITurn = async () => {
       const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayerId);
-      
+
       if (
         currentPlayer && 
         currentPlayer.isAI && 
@@ -391,7 +392,8 @@ export const useGameLogic = () => {
           currentPlayer,
           'medium'
         );
-        
+        setBotMessage(aiAction.botMessage || null);
+
         if (aiAction.action === 'challenge') {
           challenge();
         } else if (aiAction.action === 'bet' && aiAction.bet) {
@@ -399,11 +401,21 @@ export const useGameLogic = () => {
         }
       }
     };
-    
+
     const timer = setTimeout(handleAITurn, 1000);
     return () => clearTimeout(timer);
   }, [gameState, challenge, placeBet]);
-  
+
+  useEffect(() => {
+    if (
+      gameState.phase === 'revealing' ||
+      gameState.phase === 'ended' ||
+      gameState.phase === 'starting'
+    ) {
+      setBotMessage(null);
+    }
+  }, [gameState.phase]);
+
   const getCurrentPlayer = useCallback(() => {
     return gameState.players.find(player => player.id === gameState.currentPlayerId);
   }, [gameState.players, gameState.currentPlayerId]);
@@ -426,6 +438,7 @@ export const useGameLogic = () => {
     restartGame,
     getCurrentPlayer,
     getPlayerNames,
+    botMessage,
   };
 };
 

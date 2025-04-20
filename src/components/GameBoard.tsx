@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -10,6 +9,7 @@ import GameHistory from './GameHistory';
 import { Button } from '@/components/ui/button';
 import { Dices, RotateCcw, ChevronRight } from 'lucide-react';
 import GameRules from './GameRules';
+import { BotMessageSquare } from 'lucide-react';
 
 interface GameBoardProps {
   className?: string;
@@ -25,12 +25,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
     restartGame,
     isGameStarted,
     getCurrentPlayer,
-    getPlayerNames
+    getPlayerNames,
+    botMessage
   } = useGameLogic();
-  
+
   const currentPlayer = getCurrentPlayer();
   const isHumanTurn = currentPlayer && !currentPlayer.isAI;
-  
+
   useEffect(() => {
     // Game phase announcements
     switch (gameState.phase) {
@@ -66,7 +67,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
         break;
     }
   }, [gameState.phase, gameState.challengeResult, gameState.winner, gameState.roundWinner, isGameStarted, getPlayerNames]);
-  
+
   const renderGameControls = () => {
     if (!isGameStarted) {
       return (
@@ -157,36 +158,46 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
       />
     );
   };
-  
+
+  const aiPlayer = gameState.players.find((pl) => pl.isAI);
+  const showBotBubble = aiPlayer && gameState.currentPlayerId === aiPlayer.id && botMessage;
+
   return (
     <div className={cn("relative min-h-screen p-6", className)}>
       <GameRules />
-      
+
       {isGameStarted && (
         <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-secondary text-sm flex items-center">
           <span className="mr-2">Round {gameState.round}</span>
           <span className="text-xs text-primary font-medium">(1s are wild!)</span>
         </div>
       )}
-      
+
       <div className="max-w-4xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 my-8">
           {gameState.players.map((player) => (
-            <PlayerInfo
-              key={player.id}
-              player={player}
-              isActive={player.id === gameState.currentPlayerId}
-              isWinner={gameState.winner === player.id}
-              isLoser={gameState.loser === player.id}
-              showDice={gameState.phase === 'revealing' || player.id === 'human'}
-              diceCount={gameState.phase === 'revealing' ? gameState.diceCount : (player.id === 'human' ? countPlayerDice(player) : undefined)}
-            />
+            <div key={player.id} className="relative">
+              <PlayerInfo
+                player={player}
+                isActive={player.id === gameState.currentPlayerId}
+                isWinner={gameState.winner === player.id}
+                isLoser={gameState.loser === player.id}
+                showDice={gameState.phase === 'revealing' || player.id === 'human'}
+                diceCount={gameState.phase === 'revealing' ? gameState.diceCount : (player.id === 'human' ? countPlayerDice(player) : undefined)}
+              />
+              {player.isAI && showBotBubble && (
+                <div className="absolute left-full top-1/3 ml-4 p-2 px-4 bg-primary text-white rounded-xl flex items-center shadow-lg animate-fade-in">
+                  <BotMessageSquare className="mr-2 h-5 w-5 text-yellow-300" />
+                  <span className="text-base">{botMessage}</span>
+                </div>
+              )}
+            </div>
           ))}
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
           <div className="animate-slide-up">{renderGameControls()}</div>
-          
+
           <GameHistory 
             events={gameState.history}
             playerNames={getPlayerNames()}
@@ -198,7 +209,6 @@ const GameBoard: React.FC<GameBoardProps> = ({ className }) => {
   );
 };
 
-// Helper function to count dice for a specific player
 const countPlayerDice = (player: Player): Record<DiceValue, number> => {
   const count: Record<DiceValue, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   
